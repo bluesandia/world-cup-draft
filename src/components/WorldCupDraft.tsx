@@ -384,6 +384,7 @@ export function WorldCupDraft() {
                       id="leaderboard-name"
                       type="text"
                       value={leaderboardName}
+                      placeholder="ABC123"
                       onChange={(event) =>
                         setLeaderboardName(
                           event.target.value
@@ -393,11 +394,7 @@ export function WorldCupDraft() {
                         )
                       }
                       maxLength={9}
-                      disabled={
-                        !leaderboardConfigured ||
-                        leaderboardSubmitted ||
-                        leaderboardSubmitting
-                      }
+                      disabled={leaderboardSubmitted || leaderboardSubmitting}
                       className="min-w-0 flex-1 rounded-md border border-white/20 bg-white px-3 py-2 font-black uppercase text-neutral-950 outline-none focus:border-emerald-200 disabled:cursor-not-allowed disabled:bg-white/40"
                     />
                     <button
