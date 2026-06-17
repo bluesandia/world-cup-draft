@@ -5,11 +5,14 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
 const tableName = "leaderboard_scores";
 const maxNameLength = 9;
+const maxSquadNameLength = 24;
 const namePattern = /^[A-Z0-9]{1,9}$/;
+const squadNamePattern = /^[A-Z0-9 ]{1,24}$/;
 
 type SupabaseLeaderboardRow = {
   id: string;
   name: string;
+  squad_name?: string | null;
   score: number;
   result: string;
   roster: LeaderboardRosterPlayer[];
@@ -18,6 +21,7 @@ type SupabaseLeaderboardRow = {
 
 type SubmitLeaderboardBody = {
   name?: unknown;
+  squadName?: unknown;
   score?: unknown;
   result?: unknown;
   roster?: unknown;
@@ -40,6 +44,15 @@ function normalizeName(value: unknown) {
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, "")
     .slice(0, maxNameLength);
+}
+
+function normalizeSquadName(value: unknown) {
+  return String(value ?? "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9 ]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, maxSquadNameLength);
 }
 
 function isRoster(value: unknown): value is LeaderboardRosterPlayer[] {
@@ -68,6 +81,7 @@ function toLeaderboardEntry(row: SupabaseLeaderboardRow): LeaderboardEntry {
   return {
     id: row.id,
     name: row.name,
+    squadName: row.squad_name || "WORLD XI",
     score: row.score,
     result: row.result,
     roster: row.roster,
@@ -75,20 +89,33 @@ function toLeaderboardEntry(row: SupabaseLeaderboardRow): LeaderboardEntry {
   };
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   if (!isConfigured()) {
     return NextResponse.json({ configured: false, scores: [] });
   }
 
+  const requestUrl = new URL(request.url);
+  const requestedLimit = Number(requestUrl.searchParams.get("limit") ?? "10");
+  const limit = Number.isFinite(requestedLimit)
+    ? Math.min(Math.max(Math.floor(requestedLimit), 1), 500)
+    : 10;
   const url = new URL(`${supabaseUrl}/rest/v1/${tableName}`);
-  url.searchParams.set("select", "id,name,score,result,roster,created_at");
+  url.searchParams.set("select", "id,name,squad_name,score,result,roster,created_at");
   url.searchParams.set("order", "score.desc,created_at.asc");
-  url.searchParams.set("limit", "10");
+  url.searchParams.set("limit", String(limit));
 
-  const response = await fetch(url, {
+  let response = await fetch(url, {
     headers: supabaseHeaders(),
     next: { revalidate: 10 },
   });
+
+  if (!response.ok) {
+    url.searchParams.set("select", "id,name,score,result,roster,created_at");
+    response = await fetch(url, {
+      headers: supabaseHeaders(),
+      next: { revalidate: 10 },
+    });
+  }
 
   if (!response.ok) {
     return NextResponse.json(
@@ -115,10 +142,18 @@ export async function POST(request: Request) {
 
   const body = (await request.json()) as SubmitLeaderboardBody;
   const name = normalizeName(body.name);
+  const squadName = normalizeSquadName(body.squadName);
 
   if (!namePattern.test(name)) {
     return NextResponse.json(
       { error: "Name must be 1 to 9 letters or numbers." },
+      { status: 400 },
+    );
+  }
+
+  if (!squadNamePattern.test(squadName)) {
+    return NextResponse.json(
+      { error: "Squad name must be 1 to 24 letters, numbers, or spaces." },
       { status: 400 },
     );
   }
@@ -143,6 +178,7 @@ export async function POST(request: Request) {
     },
     body: JSON.stringify({
       name,
+      squad_name: squadName,
       score: body.score,
       result: body.result,
       roster: body.roster,
@@ -150,6 +186,15 @@ export async function POST(request: Request) {
   });
 
   if (!response.ok) {
+    const errorText = await response.text();
+
+    if (errorText.includes("squad_name")) {
+      return NextResponse.json(
+        { error: "Add the squad_name column in Supabase before saving squad names." },
+        { status: 502 },
+      );
+    }
+
     return NextResponse.json(
       { error: "Unable to save leaderboard score." },
       { status: 502 },

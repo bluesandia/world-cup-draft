@@ -6,7 +6,7 @@ import {
   getCountry,
   playerMatchesPrompt,
 } from "./draftPools";
-import type { DraftPrompt, Player, RosterSlot } from "./gameTypes";
+import type { DraftPrompt, Player, RosterSlot, ScoreResult, ScoreUnit } from "./gameTypes";
 
 export { initialRoster };
 
@@ -25,22 +25,6 @@ export function createRandomPrompt(
   return prompts.length > 0 ? randomItem(prompts) : { countryId: "bra", eraId: "1970s" };
 }
 
-function randomPromptFrom(
-  candidates: DraftPrompt[],
-  draftedIds: string[],
-  roster: RosterSlot[],
-): DraftPrompt {
-  const fallbackPrompts = draftPromptsForRoster(draftedIds, roster);
-
-  return randomItem(
-    candidates.length > 0
-      ? candidates
-      : fallbackPrompts.length > 0
-        ? fallbackPrompts
-        : [{ countryId: "bra", eraId: "1970s" }],
-  );
-}
-
 export function rerollCountry(
   prompt: DraftPrompt,
   draftedIds: string[] = [],
@@ -51,15 +35,8 @@ export function rerollCountry(
     (candidate) =>
       candidate.eraId === prompt.eraId && candidate.countryId !== prompt.countryId,
   );
-  const fallbackPrompts = draftPrompts.filter(
-    (candidate) => candidate.countryId !== prompt.countryId,
-  );
 
-  return randomPromptFrom(
-    sameEraPrompts.length > 0 ? sameEraPrompts : fallbackPrompts,
-    draftedIds,
-    roster,
-  );
+  return sameEraPrompts.length > 0 ? randomItem(sameEraPrompts) : prompt;
 }
 
 export function rerollDecade(
@@ -72,15 +49,8 @@ export function rerollDecade(
     (candidate) =>
       candidate.countryId === prompt.countryId && candidate.eraId !== prompt.eraId,
   );
-  const fallbackPrompts = draftPrompts.filter(
-    (candidate) => candidate.eraId !== prompt.eraId,
-  );
 
-  return randomPromptFrom(
-    sameCountryPrompts.length > 0 ? sameCountryPrompts : fallbackPrompts,
-    draftedIds,
-    roster,
-  );
+  return sameCountryPrompts.length > 0 ? randomItem(sameCountryPrompts) : prompt;
 }
 
 export function eligiblePlayers(
@@ -117,7 +87,24 @@ export function getPlayer(playerId: string | null): Player | undefined {
   return playersById.get(playerId);
 }
 
-export function scoreRoster(roster: RosterSlot[]) {
+function unitAverage(roster: RosterSlot[], slotIds: string[]): number {
+  const unitPlayers = roster
+    .filter((slot) => slotIds.includes(slot.id))
+    .map((slot) => getPlayer(slot.playerId))
+    .filter((player): player is Player => Boolean(player));
+
+  if (unitPlayers.length === 0) {
+    return 0;
+  }
+
+  return unitPlayers.reduce((sum, player) => sum + player.rating, 0) / unitPlayers.length;
+}
+
+function roundedTenths(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
+export function scoreRoster(roster: RosterSlot[]): ScoreResult | null {
   const draftedPlayers = roster
     .map((slot) => getPlayer(slot.playerId))
     .filter((player): player is Player => Boolean(player));
@@ -131,37 +118,62 @@ export function scoreRoster(roster: RosterSlot[]) {
   const elitePlayerBonus = draftedPlayers.filter((player) => player.rating >= 92).length;
   const chemistryBonus =
     new Set(draftedPlayers.map((player) => player.countryId)).size <= 4 ? 2 : 0;
-  const finalScore = Math.round(averageRating + chemistryBonus + elitePlayerBonus);
+  const unitRatings = [
+    { label: "Attack" as const, average: unitAverage(roster, ["lw", "st", "rw"]) },
+    { label: "Midfield" as const, average: unitAverage(roster, ["cm-1", "cm-2", "cm-3"]) },
+    {
+      label: "Defense" as const,
+      average: unitAverage(roster, ["lb", "cb-1", "cb-2", "rb", "gk"]),
+    },
+  ];
+  const units: ScoreUnit[] = unitRatings.map((unit) => ({
+    label: unit.label,
+    average: roundedTenths(unit.average),
+    bonus: unit.average > 86 ? 1 : 0,
+  }));
+  const unitBonus = units.reduce((sum, unit) => sum + unit.bonus, 0);
+  const finalScore = Math.round(
+    averageRating + chemistryBonus + elitePlayerBonus + unitBonus,
+  );
+
+  const resultBase = {
+    score: finalScore,
+    baseAverage: roundedTenths(averageRating),
+    chemistryBonus,
+    elitePlayerBonus,
+    unitBonus,
+    units,
+  };
 
   if (finalScore >= 98) {
-    return { label: "G.O.A.T.", score: finalScore };
+    return { ...resultBase, label: "G.O.A.T." };
   }
 
   if (finalScore >= 94) {
-    return { label: "World Cup Champion", score: finalScore };
+    return { ...resultBase, label: "World Cup Champion" };
   }
 
   if (finalScore >= 92) {
-    return { label: "Finalist", score: finalScore };
+    return { ...resultBase, label: "Finalist" };
   }
 
   if (finalScore >= 90) {
-    return { label: "Semifinalist", score: finalScore };
+    return { ...resultBase, label: "Semifinalist" };
   }
 
   if (finalScore >= 88) {
-    return { label: "Quarterfinalist", score: finalScore };
+    return { ...resultBase, label: "Quarterfinalist" };
   }
 
   if (finalScore >= 86) {
-    return { label: "Round of 16", score: finalScore };
+    return { ...resultBase, label: "Round of 16" };
   }
 
   if (finalScore >= 80) {
-    return { label: "Group Stage Exit", score: finalScore };
+    return { ...resultBase, label: "Group Stage Exit" };
   }
 
-  return { label: "Go Back To Your Country", score: finalScore };
+  return { ...resultBase, label: "Go Back To Your Country" };
 }
 
 export function playerCountryName(player: Player): string {

@@ -2004,7 +2004,7 @@ export const players: Player[] = [
     worldCupYears: [2022],
     rosterSlots: ["LW"],
     roleTags: ["LW", "RW", "CAM", "LF", "LM", "FW"],
-    rating: 89,
+    rating: 82,
     worldCupNote: "Attacking leader of the United States' 2022 side.",
   },
   {
@@ -2944,7 +2944,7 @@ export const players: Player[] = [
     worldCupYears: [2010, 2014, 2018, 2022],
     rosterSlots: ["CB", "LB", "RB"],
     roleTags: ["CB", "DF"],
-    rating: 85,
+    rating: 91,
     worldCupNote: "World Cup squad player for Brazil in 2010, 2014, 2018, 2022.",
   },
   {
@@ -2954,7 +2954,7 @@ export const players: Player[] = [
     worldCupYears: [2014, 2018, 2022],
     rosterSlots: ["LW", "ST", "CM", "RW"],
     roleTags: ["LW", "AM", "FW"],
-    rating: 83,
+    rating: 94,
     worldCupNote: "World Cup squad player for Brazil in 2014, 2018, 2022.",
   },
   {
@@ -3184,7 +3184,7 @@ export const players: Player[] = [
     worldCupYears: [2006, 2010, 2014],
     rosterSlots: ["CM"],
     roleTags: ["CM", "DM", "AM", "MF"],
-    rating: 81,
+    rating: 91,
     worldCupNote: "World Cup squad player for Ivory Coast in 2006, 2010, 2014.",
   },
   {
@@ -3194,7 +3194,7 @@ export const players: Player[] = [
     worldCupYears: [2006, 2010, 2014],
     rosterSlots: ["ST", "LW", "RW"],
     roleTags: ["CF", "FW"],
-    rating: 81,
+    rating: 92,
     worldCupNote: "World Cup squad player for Ivory Coast in 2006, 2010, 2014.",
   },
   {
@@ -4975,7 +4975,7 @@ export const players: Player[] = [
     rosterSlots: ["CM"],
     roleTags: ["CM", "MF"],
     rating: 76,
-    worldCupNote: "World Cup squad player for Serbia and Montenegro in 2006.",
+    worldCupNote: "World Cup squad player for Serbia in 2006.",
   },
   {
     id: "wc-sco-p-25807",
@@ -8055,7 +8055,7 @@ export const players: Player[] = [
     rosterSlots: ["RW", "CM", "LW"],
     roleTags: ["RM", "LM", "MF"],
     rating: 76,
-    worldCupNote: "World Cup squad player for Serbia and Montenegro in 2006.",
+    worldCupNote: "World Cup squad player for Serbia in 2006.",
   },
   {
     id: "wc-sco-p-70753",
@@ -9354,7 +9354,7 @@ export const players: Player[] = [
     worldCupYears: [2006, 2010, 2014],
     rosterSlots: ["CB", "LB", "RB"],
     roleTags: ["CB", "DF"],
-    rating: 80,
+    rating: 87,
     worldCupNote: "World Cup squad player for Ivory Coast in 2006, 2010, 2014.",
   },
   {
@@ -11135,7 +11135,7 @@ export const players: Player[] = [
     rosterSlots: ["GK"],
     roleTags: ["GK"],
     rating: 76,
-    worldCupNote: "World Cup squad player for Serbia and Montenegro in 2006.",
+    worldCupNote: "World Cup squad player for Serbia in 2006.",
   },
   {
     id: "wc-sco-p-47080",
@@ -14215,7 +14215,7 @@ export const players: Player[] = [
     rosterSlots: ["CB", "LB", "RB"],
     roleTags: ["CB", "DF"],
     rating: 76,
-    worldCupNote: "World Cup squad player for Serbia and Montenegro in 2006.",
+    worldCupNote: "World Cup squad player for Serbia in 2006.",
   },
   {
     id: "wc-sco-p-72928",
@@ -17295,7 +17295,7 @@ export const players: Player[] = [
     rosterSlots: ["CM", "RB"],
     roleTags: ["CM", "RB", "MF"],
     rating: 76,
-    worldCupNote: "World Cup squad player for Serbia and Montenegro in 2006.",
+    worldCupNote: "World Cup squad player for Serbia in 2006.",
   },
   {
     id: "wc-sco-p-22201",
@@ -20375,7 +20375,7 @@ export const players: Player[] = [
     rosterSlots: ["CB", "LB", "RB"],
     roleTags: ["CB", "LB", "DF"],
     rating: 76,
-    worldCupNote: "World Cup squad player for Serbia and Montenegro in 2006.",
+    worldCupNote: "World Cup squad player for Serbia in 2006.",
   },
   {
     id: "wc-sco-p-76869",
@@ -23455,7 +23455,7 @@ export const players: Player[] = [
     rosterSlots: ["LW", "CM"],
     roleTags: ["LM", "CM", "MF"],
     rating: 76,
-    worldCupNote: "World Cup squad player for Serbia and Montenegro in 2006.",
+    worldCupNote: "World Cup squad player for Serbia in 2006.",
   },
   {
     id: "wc-sco-p-42336",
@@ -26535,7 +26535,7 @@ export const players: Player[] = [
     rosterSlots: ["ST", "LW", "RW"],
     roleTags: ["CF", "FW"],
     rating: 76,
-    worldCupNote: "World Cup squad player for Serbia and Montenegro in 2006.",
+    worldCupNote: "World Cup squad player for Serbia in 2006.",
   },
   {
     id: "wc-sco-p-09457",
@@ -29615,7 +29615,7 @@ export const players: Player[] = [
     rosterSlots: ["CM", "ST", "LW", "RW"],
     roleTags: ["MF", "FW"],
     rating: 76,
-    worldCupNote: "World Cup squad player for Serbia and Montenegro in 2006.",
+    worldCupNote: "World Cup squad player for Serbia in 2006.",
   },
   {
     id: "wc-sco-p-91151",

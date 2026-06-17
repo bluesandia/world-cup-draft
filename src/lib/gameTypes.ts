@@ -25,6 +25,7 @@ export type Country = {
   id: string;
   name: string;
   confederation: Confederation;
+  flag: string;
 };
 
 export type Era = {
@@ -55,6 +56,22 @@ export type DraftPrompt = {
   eraId: string;
 };
 
+export type ScoreUnit = {
+  label: "Attack" | "Midfield" | "Defense";
+  average: number;
+  bonus: number;
+};
+
+export type ScoreResult = {
+  label: string;
+  score: number;
+  baseAverage: number;
+  chemistryBonus: number;
+  elitePlayerBonus: number;
+  unitBonus: number;
+  units: ScoreUnit[];
+};
+
 export type LeaderboardRosterPlayer = {
   slot: RosterPosition;
   playerId: string;
@@ -66,6 +83,7 @@ export type LeaderboardRosterPlayer = {
 export type LeaderboardEntry = {
   id: string;
   name: string;
+  squadName: string;
   score: number;
   result: string;
   roster: LeaderboardRosterPlayer[];

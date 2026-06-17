@@ -1998,7 +1998,7 @@ export const players: Player[] = [
     worldCupYears: [2022],
     rosterSlots: ["LW"],
     roleTags: ["LW", "RW", "CAM"],
-    rating: 89,
+    rating: 82,
     worldCupNote: "Attacking leader of the United States' 2022 side.",
   },
   {

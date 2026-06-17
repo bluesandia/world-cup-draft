@@ -58,7 +58,9 @@ export function playerMatchesPrompt(player: Player, prompt: DraftPrompt): boolea
 }
 
 export function promptLabel(prompt: DraftPrompt): string {
-  return `${getCountry(prompt.countryId).name} · ${getEra(prompt.eraId).label}`;
+  const country = getCountry(prompt.countryId);
+
+  return `${country.flag} ${country.name} · ${getEra(prompt.eraId).label}`;
 }
 
 export function draftPromptsForRoster(

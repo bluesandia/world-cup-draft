@@ -1,11 +1,16 @@
 create table if not exists leaderboard_scores (
   id uuid primary key default gen_random_uuid(),
   name text not null check (name ~ '^[A-Z0-9]{1,9}$'),
+  squad_name text not null default 'WORLD XI' check (squad_name ~ '^[A-Z0-9 ]{1,24}$'),
   score integer not null check (score >= 0 and score <= 150),
   result text not null,
   roster jsonb not null,
   created_at timestamptz not null default now()
 );
+
+alter table leaderboard_scores
+add column if not exists squad_name text not null default 'WORLD XI'
+check (squad_name ~ '^[A-Z0-9 ]{1,24}$');
 
 alter table leaderboard_scores enable row level security;
 
@@ -21,6 +26,7 @@ on leaderboard_scores
 for insert
 with check (
   name ~ '^[A-Z0-9]{1,9}$'
+  and squad_name ~ '^[A-Z0-9 ]{1,24}$'
   and score >= 0
   and score <= 150
   and jsonb_typeof(roster) = 'array'

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   bestOpenSlotForPlayer,
   canFitSlot,
@@ -13,7 +14,7 @@ import {
   rerollDecade,
   scoreRoster,
 } from "@/lib/gameLogic";
-import { promptLabel } from "@/lib/draftPools";
+import { draftPromptsForRoster, promptLabel } from "@/lib/draftPools";
 import type {
   DraftPrompt,
   LeaderboardEntry,
@@ -23,13 +24,25 @@ import type {
 } from "@/lib/gameTypes";
 
 const maxChoices = 4;
+const formationRows = [
+  ["lw", "st", "rw"],
+  ["cm-1", "cm-2", "cm-3"],
+  ["lb", "cb-1", "cb-2", "rb"],
+  ["gk"],
+];
 const starterPrompt: DraftPrompt = {
   countryId: "bra",
   eraId: "1970s",
 };
+const rollDurationMs = 1100;
+const rollTickMs = 85;
+type RollMode = "full" | "country" | "decade";
 
 export function WorldCupDraft() {
   const [prompt, setPrompt] = useState<DraftPrompt>(starterPrompt);
+  const [displayedPrompt, setDisplayedPrompt] = useState<DraftPrompt>(starterPrompt);
+  const [isRolling, setIsRolling] = useState(false);
+  const [rollingLabel, setRollingLabel] = useState("Rolling");
   const [roster, setRoster] = useState<RosterSlot[]>(initialRoster);
   const [countryRerolls, setCountryRerolls] = useState(1);
   const [decadeRerolls, setDecadeRerolls] = useState(1);
@@ -39,8 +52,12 @@ export function WorldCupDraft() {
   const [leaderboardConfigured, setLeaderboardConfigured] = useState(true);
   const [leaderboardMessage, setLeaderboardMessage] = useState("Loading leaderboard.");
   const [leaderboardName, setLeaderboardName] = useState("");
+  const [leaderboardSquadName, setLeaderboardSquadName] = useState("");
   const [leaderboardSubmitting, setLeaderboardSubmitting] = useState(false);
   const [leaderboardSubmitted, setLeaderboardSubmitted] = useState(false);
+  const [shareMessage, setShareMessage] = useState("");
+  const rollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const rollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const draftedIds = roster
     .map((slot) => slot.playerId)
@@ -76,7 +93,10 @@ export function WorldCupDraft() {
   );
 
   useEffect(() => {
-    setPrompt(createRandomPrompt());
+    startPromptRoll(createRandomPrompt(), "Opening draw complete. Pick one player.");
+    return () => {
+      clearRollTimers();
+    };
   }, []);
 
   useEffect(() => {
@@ -106,15 +126,104 @@ export function WorldCupDraft() {
     }
   }
 
+  function clearRollTimers() {
+    if (rollIntervalRef.current) {
+      clearInterval(rollIntervalRef.current);
+      rollIntervalRef.current = null;
+    }
+
+    if (rollTimeoutRef.current) {
+      clearTimeout(rollTimeoutRef.current);
+      rollTimeoutRef.current = null;
+    }
+  }
+
+  function startPromptRoll(
+    finalPrompt: DraftPrompt,
+    settledMessage: string,
+    rollDraftedIds = draftedIds,
+    rollRoster = roster,
+    rollMode: RollMode = "full",
+  ) {
+    clearRollTimers();
+    setIsRolling(true);
+    setSelectedSlotId(null);
+    setRollingLabel(
+      rollMode === "country"
+        ? "Rolling country"
+        : rollMode === "decade"
+          ? "Rolling decade"
+          : "Rolling",
+    );
+    setMessage(
+      rollMode === "country"
+        ? "Rolling the next country."
+        : rollMode === "decade"
+          ? "Rolling the next decade."
+          : "Rolling the next country and era.",
+    );
+
+    rollIntervalRef.current = setInterval(() => {
+      setDisplayedPrompt(
+        createRollingPrompt(finalPrompt, rollDraftedIds, rollRoster, rollMode),
+      );
+    }, rollTickMs);
+
+    rollTimeoutRef.current = setTimeout(() => {
+      clearRollTimers();
+      setPrompt(finalPrompt);
+      setDisplayedPrompt(finalPrompt);
+      setIsRolling(false);
+      setRollingLabel("Rolling");
+      setMessage(settledMessage);
+    }, rollDurationMs);
+  }
+
+  function createRollingPrompt(
+    finalPrompt: DraftPrompt,
+    rollDraftedIds: string[],
+    rollRoster: RosterSlot[],
+    rollMode: RollMode,
+  ): DraftPrompt {
+    if (rollMode === "full") {
+      return createRandomPrompt(rollDraftedIds, rollRoster);
+    }
+
+    const prompts = draftPromptsForRoster(rollDraftedIds, rollRoster);
+    const candidates = prompts.filter((candidate) =>
+      rollMode === "country"
+        ? candidate.eraId === finalPrompt.eraId
+        : candidate.countryId === finalPrompt.countryId,
+    );
+
+    if (candidates.length === 0) {
+      return finalPrompt;
+    }
+
+    const candidate = candidates[Math.floor(Math.random() * candidates.length)];
+
+    return rollMode === "country"
+      ? { countryId: candidate.countryId, eraId: finalPrompt.eraId }
+      : { countryId: finalPrompt.countryId, eraId: candidate.eraId };
+  }
+
   function resetGame() {
-    setPrompt(createRandomPrompt());
+    const nextPrompt = createRandomPrompt([], initialRoster);
+
     setRoster(initialRoster);
     setCountryRerolls(1);
     setDecadeRerolls(1);
     setSelectedSlotId(null);
-    setMessage("New tournament. Build your XI.");
     setLeaderboardName("");
+    setLeaderboardSquadName("");
     setLeaderboardSubmitted(false);
+    setShareMessage("");
+    startPromptRoll(
+      nextPrompt,
+      "New tournament draw complete. Build your XI.",
+      [],
+      initialRoster,
+    );
   }
 
   async function submitLeaderboardScore() {
@@ -133,6 +242,7 @@ export function WorldCupDraft() {
         },
         body: JSON.stringify({
           name: leaderboardName,
+          squadName: leaderboardSquadName,
           score: result.score,
           result: result.label,
           roster: leaderboardRoster,
@@ -146,7 +256,6 @@ export function WorldCupDraft() {
       }
 
       setLeaderboardSubmitted(true);
-      setLeaderboardName("");
       setLeaderboardMessage("Score saved.");
       await loadLeaderboard();
     } catch {
@@ -157,27 +266,57 @@ export function WorldCupDraft() {
   }
 
   function handleCountryReroll() {
-    if (countryRerolls === 0) {
+    if (countryRerolls === 0 || isRolling) {
       return;
     }
 
-    setPrompt((currentPrompt) => rerollCountry(currentPrompt, draftedIds, roster));
+    const nextPrompt = rerollCountry(prompt, draftedIds, roster);
+
+    if (
+      nextPrompt.countryId === prompt.countryId &&
+      nextPrompt.eraId === prompt.eraId
+    ) {
+      setMessage("No other country is available for this decade.");
+      return;
+    }
+
     setCountryRerolls(0);
-    setMessage("Country rerolled. Choose carefully.");
+    startPromptRoll(
+      nextPrompt,
+      "Country rerolled. Choose carefully.",
+      draftedIds,
+      roster,
+      "country",
+    );
   }
 
   function handleDecadeReroll() {
-    if (decadeRerolls === 0) {
+    if (decadeRerolls === 0 || isRolling) {
       return;
     }
 
-    setPrompt((currentPrompt) => rerollDecade(currentPrompt, draftedIds, roster));
+    const nextPrompt = rerollDecade(prompt, draftedIds, roster);
+
+    if (
+      nextPrompt.countryId === prompt.countryId &&
+      nextPrompt.eraId === prompt.eraId
+    ) {
+      setMessage("No other decade is available for this country.");
+      return;
+    }
+
     setDecadeRerolls(0);
-    setMessage("Decade rerolled. The board changed.");
+    startPromptRoll(
+      nextPrompt,
+      "Decade rerolled. The board changed.",
+      draftedIds,
+      roster,
+      "decade",
+    );
   }
 
   function draftPlayer(player: Player) {
-    if (result) {
+    if (result || isRolling) {
       return;
     }
 
@@ -200,13 +339,19 @@ export function WorldCupDraft() {
     setRoster(nextRoster);
     setSelectedSlotId(null);
     if (nextDraftedIds.length < initialRoster.length) {
-      setPrompt(createRandomPrompt(nextDraftedIds, nextRoster));
+      startPromptRoll(
+        createRandomPrompt(nextDraftedIds, nextRoster),
+        `${player.name} drafted at ${targetSlot.label}.`,
+        nextDraftedIds,
+        nextRoster,
+      );
+      return;
     }
     setMessage(`${player.name} drafted at ${targetSlot.label}.`);
   }
 
   function handleRosterSlotClick(clickedSlot: RosterSlot) {
-    if (result) {
+    if (result || isRolling) {
       return;
     }
 
@@ -268,11 +413,92 @@ export function WorldCupDraft() {
     );
   }
 
+  async function shareGame() {
+    if (!result) {
+      return;
+    }
+
+    const shareUrl = window.location.origin;
+    const squadName = leaderboardSquadName || "WORLD XI";
+    const shareText = `I built ${squadName} and scored ${result.score} (${result.label}) in World Cup XI Draft.`;
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: "World Cup XI Draft",
+          text: shareText,
+          url: shareUrl,
+        });
+        setShareMessage("Share sheet opened.");
+        return;
+      }
+
+      await navigator.clipboard.writeText(`${shareText} ${shareUrl}`);
+      setShareMessage("Game link copied.");
+    } catch {
+      setShareMessage("Unable to share from this browser.");
+    }
+  }
+
+  function renderRosterSlot(slot: RosterSlot) {
+    const player = getPlayer(slot.playerId);
+    const isSelected = selectedSlotId === slot.id;
+    const selectedSlot = roster.find((candidate) => candidate.id === selectedSlotId);
+    const selectedPlayer = getPlayer(selectedSlot?.playerId ?? null);
+    const canReceiveSelectedPlayer =
+      Boolean(selectedPlayer) &&
+      slot.playerId === null &&
+      selectedPlayer !== undefined &&
+      canFitSlot(selectedPlayer, slot);
+
+    return (
+      <button
+        key={slot.id}
+        type="button"
+        onClick={() => handleRosterSlotClick(slot)}
+        disabled={Boolean(result) || isRolling}
+        className={`min-h-24 rounded-md border p-2 text-center shadow-sm transition ${
+          isSelected
+            ? "border-emerald-950 bg-emerald-100"
+            : canReceiveSelectedPlayer
+              ? "border-emerald-800 bg-emerald-50"
+              : "border-white/25 bg-white/92"
+        } ${
+          result || isRolling
+            ? "cursor-default"
+            : "hover:border-emerald-950 hover:bg-emerald-50"
+        }`}
+      >
+        <span className="mx-auto block w-fit rounded bg-neutral-950 px-2 py-1 text-xs font-black text-white">
+          {slot.label}
+        </span>
+        <span className="mt-2 block text-sm font-black leading-tight text-neutral-950">
+          {player ? player.name : "Open"}
+        </span>
+        <span className="mt-1 block text-xs font-semibold leading-tight text-neutral-600">
+          {player
+            ? `${playerCountryName(player)} · ${player.rosterSlots.join(" / ")}`
+            : canReceiveSelectedPlayer
+              ? `Move ${selectedPlayer?.name} here`
+              : isSelected
+                ? "Target slot"
+                : "Click slot"}
+        </span>
+      </button>
+    );
+  }
+
   return (
     <main className="min-h-screen px-4 py-6 text-neutral-950 sm:px-6 lg:px-8">
       <section className="mx-auto flex w-full max-w-7xl flex-col gap-6">
         <header className="flex flex-col gap-4 border-b border-neutral-950/15 pb-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
+            <Link
+              href="/leaderboard"
+              className="mb-4 inline-flex rounded-md border border-neutral-950 bg-neutral-950 px-4 py-2 text-sm font-black text-white transition hover:bg-emerald-800"
+            >
+              Menu
+            </Link>
             <p className="text-sm font-bold uppercase tracking-wide text-emerald-800">
               World Cup XI Draft
             </p>
@@ -284,7 +510,7 @@ export function WorldCupDraft() {
             <button
               type="button"
               onClick={handleCountryReroll}
-              disabled={countryRerolls === 0 || Boolean(result)}
+              disabled={countryRerolls === 0 || Boolean(result) || isRolling}
               className="rounded-md border border-neutral-950 bg-neutral-950 px-4 py-2 text-sm font-bold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:border-neutral-400 disabled:bg-neutral-300 disabled:text-neutral-600"
             >
               Country reroll: {countryRerolls}
@@ -292,7 +518,7 @@ export function WorldCupDraft() {
             <button
               type="button"
               onClick={handleDecadeReroll}
-              disabled={decadeRerolls === 0 || Boolean(result)}
+              disabled={decadeRerolls === 0 || Boolean(result) || isRolling}
               className="rounded-md border border-neutral-950 bg-white px-4 py-2 text-sm font-bold text-neutral-950 transition hover:border-emerald-800 hover:text-emerald-800 disabled:cursor-not-allowed disabled:border-neutral-300 disabled:text-neutral-400"
             >
               Decade reroll: {decadeRerolls}
@@ -313,7 +539,19 @@ export function WorldCupDraft() {
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-sm font-semibold text-neutral-600">Current pool</p>
-                  <h2 className="mt-1 text-3xl font-black">{promptLabel(prompt)}</h2>
+                  <h2
+                    className={`mt-1 text-3xl font-black transition ${
+                      isRolling ? "text-emerald-800" : "text-neutral-950"
+                    }`}
+                  >
+                    {promptLabel(displayedPrompt)}
+                  </h2>
+                  {isRolling ? (
+                    <div className="mt-3 flex w-fit items-center gap-2 rounded-md border border-emerald-800 bg-emerald-50 px-3 py-2 text-sm font-black uppercase text-emerald-900">
+                      <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-700" />
+                      {rollingLabel}
+                    </div>
+                  ) : null}
                 </div>
                 <div className="rounded-md bg-emerald-900 px-4 py-3 text-white">
                   <p className="text-xs font-bold uppercase text-emerald-100">Roster</p>
@@ -326,17 +564,26 @@ export function WorldCupDraft() {
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
-              {choices.length > 0 ? (
+              {isRolling ? (
+                <div className="rounded-lg border border-dashed border-emerald-700 bg-emerald-50 p-6 text-center sm:col-span-2">
+                  <p className="text-sm font-black uppercase tracking-wide text-emerald-800">
+                    {rollingLabel}
+                  </p>
+                  <h3 className="mt-2 text-3xl font-black text-neutral-950">
+                    {promptLabel(displayedPrompt)}
+                  </h3>
+                </div>
+              ) : choices.length > 0 ? (
                 choices.map((player) => (
                   <button
                     key={player.id}
                     type="button"
                     onClick={() => draftPlayer(player)}
-                    disabled={Boolean(result)}
+                    disabled={Boolean(result) || isRolling}
                     className="group rounded-lg border border-neutral-950/15 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-700 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <h3 className="text-xl font-black">{player.name}</h3>
                         <p className="mt-1 text-sm font-bold text-emerald-800">
                           Slots: {player.rosterSlots.join(" / ")}
@@ -368,18 +615,37 @@ export function WorldCupDraft() {
 
           <aside className="flex flex-col gap-4">
             {result ? (
-              <div className="rounded-lg border border-emerald-900 bg-emerald-950 p-5 text-white shadow-sm">
+              <div className="order-1 rounded-lg border border-emerald-900 bg-emerald-950 p-5 text-white shadow-sm">
                 <p className="text-sm font-bold uppercase text-emerald-100">Final result</p>
                 <h2 className="mt-2 text-3xl font-black">{result.label}</h2>
                 <p className="mt-2 text-sm text-emerald-50">Squad score: {result.score}</p>
+                <div className="mt-4 grid gap-2 rounded-md border border-white/15 bg-white/10 p-3">
+                  <div className="grid grid-cols-3 gap-2">
+                    {result.units.map((unit) => (
+                      <div key={unit.label}>
+                        <p className="text-[11px] font-black uppercase text-emerald-100">
+                          {unit.label}
+                        </p>
+                        <p className="text-sm font-black">
+                          {unit.average}
+                          {unit.bonus > 0 ? " +1" : ""}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs font-semibold text-emerald-100">
+                    Base {result.baseAverage} · Chemistry +{result.chemistryBonus} · Elite +
+                    {result.elitePlayerBonus} · Units +{result.unitBonus}
+                  </p>
+                </div>
                 <div className="mt-4 border-t border-white/20 pt-4">
-                  <label
-                    htmlFor="leaderboard-name"
-                    className="text-xs font-bold uppercase text-emerald-100"
-                  >
-                    Leaderboard name
-                  </label>
-                  <div className="mt-2 flex gap-2">
+                  <div className="grid gap-3">
+                    <label
+                      htmlFor="leaderboard-name"
+                      className="text-xs font-bold uppercase text-emerald-100"
+                    >
+                      Player name
+                    </label>
                     <input
                       id="leaderboard-name"
                       type="text"
@@ -397,30 +663,71 @@ export function WorldCupDraft() {
                       disabled={leaderboardSubmitted || leaderboardSubmitting}
                       className="min-w-0 flex-1 rounded-md border border-white/20 bg-white px-3 py-2 font-black uppercase text-neutral-950 outline-none focus:border-emerald-200 disabled:cursor-not-allowed disabled:bg-white/40"
                     />
-                    <button
-                      type="button"
-                      onClick={submitLeaderboardScore}
-                      disabled={
-                        !leaderboardConfigured ||
-                        leaderboardSubmitted ||
-                        leaderboardSubmitting ||
-                        leaderboardName.length === 0
-                      }
-                      className="rounded-md bg-white px-3 py-2 text-sm font-black text-emerald-950 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:bg-white/40 disabled:text-emerald-950/50"
+
+                    <label
+                      htmlFor="squad-name"
+                      className="text-xs font-bold uppercase text-emerald-100"
                     >
-                      Save
-                    </button>
+                      Squad name
+                    </label>
+                    <input
+                      id="squad-name"
+                      type="text"
+                      value={leaderboardSquadName}
+                      placeholder="SAMBA XI"
+                      onChange={(event) =>
+                        setLeaderboardSquadName(
+                          event.target.value
+                            .toUpperCase()
+                            .replace(/[^A-Z0-9 ]/g, "")
+                            .replace(/\s+/g, " ")
+                            .slice(0, 24),
+                        )
+                      }
+                      maxLength={24}
+                      disabled={leaderboardSubmitted || leaderboardSubmitting}
+                      className="min-w-0 rounded-md border border-white/20 bg-white px-3 py-2 font-black uppercase text-neutral-950 outline-none focus:border-emerald-200 disabled:cursor-not-allowed disabled:bg-white/40"
+                    />
+
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={submitLeaderboardScore}
+                        disabled={
+                          !leaderboardConfigured ||
+                          leaderboardSubmitted ||
+                          leaderboardSubmitting ||
+                          leaderboardName.length === 0 ||
+                          leaderboardSquadName.trim().length === 0
+                        }
+                        className="rounded-md bg-white px-3 py-2 text-sm font-black text-emerald-950 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:bg-white/40 disabled:text-emerald-950/50"
+                      >
+                        Save score
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void shareGame()}
+                        className="rounded-md border border-white/30 px-3 py-2 text-sm font-black text-white transition hover:bg-white/10"
+                      >
+                        Share this game
+                      </button>
+                    </div>
                   </div>
                   <p className="mt-2 text-xs font-semibold text-emerald-100">
                     {leaderboardSubmitted
                       ? "Score locked in."
-                      : "Use 1-9 letters or numbers."}
+                      : "Player name: 1-9 letters or numbers. Squad name: 1-24 letters, numbers, or spaces."}
                   </p>
+                  {shareMessage ? (
+                    <p className="mt-2 text-xs font-semibold text-emerald-100">
+                      {shareMessage}
+                    </p>
+                  ) : null}
                 </div>
               </div>
             ) : null}
 
-            <div className="rounded-lg border border-neutral-950/15 bg-white/78 p-4 shadow-sm">
+            <div className="order-3 rounded-lg border border-neutral-950/15 bg-white/78 p-4 shadow-sm">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div>
                   <h2 className="text-xl font-black">Leaderboard</h2>
@@ -449,7 +756,7 @@ export function WorldCupDraft() {
                       <span className="min-w-0">
                         <span className="block truncate font-black">{entry.name}</span>
                         <span className="block truncate text-xs font-semibold text-neutral-600">
-                          {entry.result}
+                          {entry.squadName} · {entry.result}
                         </span>
                       </span>
                       <span className="text-right text-lg font-black">{entry.score}</span>
@@ -463,64 +770,32 @@ export function WorldCupDraft() {
               </div>
             </div>
 
-            <div className="rounded-lg border border-neutral-950/15 bg-white/78 p-4 shadow-sm">
+            <div className="order-2 rounded-lg border border-neutral-950/15 bg-white/78 p-4 shadow-sm">
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="text-xl font-black">Your XI</h2>
                 <p className="text-sm font-bold text-neutral-600">4-3-3</p>
               </div>
 
-              <div className="grid gap-2">
-                {roster.map((slot) => {
-                  const player = getPlayer(slot.playerId);
-                  const isSelected = selectedSlotId === slot.id;
-                  const selectedSlot = roster.find(
-                    (candidate) => candidate.id === selectedSlotId,
-                  );
-                  const selectedPlayer = getPlayer(selectedSlot?.playerId ?? null);
-                  const canReceiveSelectedPlayer =
-                    Boolean(selectedPlayer) &&
-                    slot.playerId === null &&
-                    selectedPlayer !== undefined &&
-                    canFitSlot(selectedPlayer, slot);
-
-                  return (
-                    <button
-                      key={slot.id}
-                      type="button"
-                      onClick={() => handleRosterSlotClick(slot)}
-                      disabled={Boolean(result)}
-                      className={`grid min-h-16 grid-cols-[52px_1fr] items-center gap-3 rounded-md border p-3 text-left transition ${
-                        isSelected
-                          ? "border-emerald-800 bg-emerald-50"
-                          : canReceiveSelectedPlayer
-                            ? "border-emerald-700 bg-emerald-50"
-                          : "border-neutral-950/10 bg-white"
-                      } ${
-                        result
-                          ? "cursor-default"
-                          : "hover:border-emerald-700 hover:bg-emerald-50"
-                      }`}
+              <div className="relative overflow-hidden rounded-lg border border-emerald-950 bg-emerald-900 p-3 text-white shadow-inner">
+                <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.08)_1px,transparent_1px)] bg-[size:36px_36px]" />
+                <div className="absolute left-1/2 top-1/2 h-20 w-20 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/30" />
+                <div className="relative grid min-h-[520px] grid-rows-[1fr_1fr_1.12fr_0.82fr] gap-3">
+                  {formationRows.map((row) => (
+                    <div
+                      key={row.join("-")}
+                      className="grid items-center gap-2"
+                      style={{
+                        gridTemplateColumns: `repeat(${row.length}, minmax(0, 1fr))`,
+                      }}
                     >
-                      <span className="rounded-md bg-neutral-950 px-2 py-2 text-center text-sm font-black text-white">
-                        {slot.label}
-                      </span>
-                      <span>
-                        <span className="block font-black">
-                          {player ? player.name : "Open slot"}
-                        </span>
-                        <span className="block text-sm font-semibold text-neutral-600">
-                          {player
-                            ? `${playerCountryName(player)}, ${player.rosterSlots.join(" / ")}`
-                            : canReceiveSelectedPlayer
-                              ? `Move ${selectedPlayer?.name} here`
-                            : isSelected
-                              ? "Next valid player goes here"
-                              : "Click to target this slot"}
-                        </span>
-                      </span>
-                    </button>
-                  );
-                })}
+                      {row.map((slotId) => {
+                        const slot = roster.find((candidate) => candidate.id === slotId);
+
+                        return slot ? renderRosterSlot(slot) : null;
+                      })}
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </aside>
