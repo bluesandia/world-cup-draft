@@ -128,31 +128,40 @@ export function scoreRoster(roster: RosterSlot[]) {
 
   const totalRating = draftedPlayers.reduce((sum, player) => sum + player.rating, 0);
   const averageRating = totalRating / draftedPlayers.length;
+  const elitePlayerBonus = draftedPlayers.filter((player) => player.rating >= 92).length;
   const chemistryBonus =
     new Set(draftedPlayers.map((player) => player.countryId)).size <= 4 ? 2 : 0;
-  const finalScore = Math.round(averageRating + chemistryBonus);
+  const finalScore = Math.round(averageRating + chemistryBonus + elitePlayerBonus);
 
-  if (finalScore >= 96) {
-    return { label: "World Cup Champion", score: finalScore };
+  if (finalScore >= 98) {
+    return { label: "G.O.A.T.", score: finalScore };
   }
 
   if (finalScore >= 94) {
-    return { label: "Finalist", score: finalScore };
+    return { label: "World Cup Champion", score: finalScore };
   }
 
   if (finalScore >= 92) {
-    return { label: "Semifinal", score: finalScore };
+    return { label: "Finalist", score: finalScore };
   }
 
   if (finalScore >= 90) {
-    return { label: "Quarterfinal", score: finalScore };
+    return { label: "Semifinalist", score: finalScore };
   }
 
-  if (finalScore >= 87) {
+  if (finalScore >= 88) {
+    return { label: "Quarterfinalist", score: finalScore };
+  }
+
+  if (finalScore >= 86) {
     return { label: "Round of 16", score: finalScore };
   }
 
-  return { label: "Group Stage Exit", score: finalScore };
+  if (finalScore >= 80) {
+    return { label: "Group Stage Exit", score: finalScore };
+  }
+
+  return { label: "Go Back To Your Country", score: finalScore };
 }
 
 export function playerCountryName(player: Player): string {

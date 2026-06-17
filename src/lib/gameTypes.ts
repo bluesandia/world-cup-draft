@@ -54,3 +54,20 @@ export type DraftPrompt = {
   countryId: string;
   eraId: string;
 };
+
+export type LeaderboardRosterPlayer = {
+  slot: RosterPosition;
+  playerId: string;
+  name: string;
+  country: string;
+  rating: number;
+};
+
+export type LeaderboardEntry = {
+  id: string;
+  name: string;
+  score: number;
+  result: string;
+  roster: LeaderboardRosterPlayer[];
+  createdAt: string;
+};
