@@ -15,6 +15,7 @@ import {
   scoreRoster,
 } from "@/lib/gameLogic";
 import { draftPromptsForRoster, promptLabel } from "@/lib/draftPools";
+import { ratingStyle } from "@/lib/ratingStyles";
 import type {
   DraftPrompt,
   LeaderboardEntry,
@@ -450,6 +451,7 @@ export function WorldCupDraft() {
       slot.playerId === null &&
       selectedPlayer !== undefined &&
       canFitSlot(selectedPlayer, slot);
+    const playerStyle = player ? ratingStyle(player.rating) : null;
 
     return (
       <button
@@ -458,7 +460,9 @@ export function WorldCupDraft() {
         onClick={() => handleRosterSlotClick(slot)}
         disabled={Boolean(result) || isRolling}
         className={`min-h-24 rounded-md border p-2 text-center shadow-sm transition ${
-          isSelected
+          playerStyle
+            ? playerStyle.panel
+            : isSelected
             ? "border-emerald-950 bg-emerald-100"
             : canReceiveSelectedPlayer
               ? "border-emerald-800 bg-emerald-50"
@@ -466,16 +470,39 @@ export function WorldCupDraft() {
         } ${
           result || isRolling
             ? "cursor-default"
-            : "hover:border-emerald-950 hover:bg-emerald-50"
-        }`}
+            : playerStyle
+              ? "hover:brightness-105"
+              : "hover:border-emerald-950 hover:bg-emerald-50"
+        } ${isSelected ? "ring-2 ring-emerald-950" : ""}`}
       >
-        <span className="mx-auto block w-fit rounded bg-neutral-950 px-2 py-1 text-xs font-black text-white">
+        <span
+          className={`mx-auto block w-fit rounded px-2 py-1 text-xs font-black ${
+            playerStyle ? playerStyle.badge : "bg-neutral-950 text-white"
+          }`}
+        >
           {slot.label}
         </span>
-        <span className="mt-2 block text-sm font-black leading-tight text-neutral-950">
+        {player ? (
+          <span
+            className={`mx-auto mt-2 block w-fit rounded px-2 py-1 text-lg font-black ${
+              playerStyle?.badge ?? "bg-neutral-950 text-white"
+            }`}
+          >
+            {player.rating}
+          </span>
+        ) : null}
+        <span
+          className={`mt-2 block text-sm font-black leading-tight ${
+            playerStyle ? playerStyle.accent : "text-neutral-950"
+          }`}
+        >
           {player ? player.name : "Open"}
         </span>
-        <span className="mt-1 block text-xs font-semibold leading-tight text-neutral-600">
+        <span
+          className={`mt-1 block text-xs font-semibold leading-tight ${
+            playerStyle ? playerStyle.muted : "text-neutral-600"
+          }`}
+        >
           {player
             ? `${playerCountryName(player)} · ${player.rosterSlots.join(" / ")}`
             : canReceiveSelectedPlayer
@@ -574,33 +601,43 @@ export function WorldCupDraft() {
                   </h3>
                 </div>
               ) : choices.length > 0 ? (
-                choices.map((player) => (
-                  <button
-                    key={player.id}
-                    type="button"
-                    onClick={() => draftPlayer(player)}
-                    disabled={Boolean(result) || isRolling}
-                    className="group rounded-lg border border-neutral-950/15 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-700 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <h3 className="text-xl font-black">{player.name}</h3>
-                        <p className="mt-1 text-sm font-bold text-emerald-800">
-                          Slots: {player.rosterSlots.join(" / ")}
-                        </p>
+                choices.map((player) => {
+                  const playerStyle = ratingStyle(player.rating);
+
+                  return (
+                    <button
+                      key={player.id}
+                      type="button"
+                      onClick={() => draftPlayer(player)}
+                      disabled={Boolean(result) || isRolling}
+                      className={`group rounded-lg border p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:brightness-105 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60 ${playerStyle.panel}`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <h3 className={`text-xl font-black ${playerStyle.accent}`}>
+                            {player.name}
+                          </h3>
+                          <p className={`mt-1 text-sm font-bold ${playerStyle.muted}`}>
+                            Slots: {player.rosterSlots.join(" / ")}
+                          </p>
+                        </div>
+                        <span
+                          className={`rounded-md px-3 py-2 text-lg font-black ${playerStyle.badge}`}
+                        >
+                          {player.rating}
+                        </span>
                       </div>
-                      <span className="rounded-md bg-neutral-950 px-3 py-2 text-lg font-black text-white">
-                        {player.rating}
-                      </span>
-                    </div>
-                    <p className="mt-3 text-sm leading-6 text-neutral-700">
-                      {player.worldCupNote}
-                    </p>
-                    <p className="mt-3 text-xs font-bold uppercase tracking-wide text-neutral-500">
-                      Roles: {player.roleTags.join(" / ")}
-                    </p>
-                  </button>
-                ))
+                      <p className={`mt-3 text-sm leading-6 ${playerStyle.muted}`}>
+                        {player.worldCupNote}
+                      </p>
+                      <p
+                        className={`mt-3 text-xs font-bold uppercase tracking-wide ${playerStyle.muted}`}
+                      >
+                        Roles: {player.roleTags.join(" / ")}
+                      </p>
+                    </button>
+                  );
+                })
               ) : (
                 <div className="rounded-lg border border-dashed border-neutral-400 bg-white/70 p-5 sm:col-span-2">
                   <h3 className="text-xl font-black">No eligible players found</h3>

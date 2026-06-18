@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { ratingStyle } from "@/lib/ratingStyles";
 import type { LeaderboardEntry, RosterPosition } from "@/lib/gameTypes";
 
 const formationRows: RosterPosition[][] = [
@@ -147,20 +148,47 @@ export function LeaderboardPage() {
                     {row.map((slot, slotIndex) => {
                       const player =
                         playersForSlot(slot)[slotOccurrenceIndex(row, slot, slotIndex)];
+                      const playerStyle = player ? ratingStyle(player.rating) : null;
 
                       return (
                         <div
                           key={`${slot}-${slotIndex}`}
-                          className="min-h-24 rounded-md border border-white/25 bg-white/92 p-3 text-center text-neutral-950 shadow-sm"
+                          className={`min-h-24 rounded-md border p-3 text-center shadow-sm ${
+                            playerStyle
+                              ? playerStyle.panel
+                              : "border-white/25 bg-white/92 text-neutral-950"
+                          }`}
                         >
-                          <p className="text-xs font-black text-emerald-800">{slot}</p>
-                          <p className="mt-1 text-sm font-black leading-tight">
+                          <p
+                            className={`mx-auto w-fit rounded px-2 py-1 text-xs font-black ${
+                              playerStyle ? playerStyle.badge : "bg-neutral-950 text-white"
+                            }`}
+                          >
+                            {slot}
+                          </p>
+                          <p
+                            className={`mt-1 text-sm font-black leading-tight ${
+                              playerStyle ? playerStyle.accent : "text-neutral-950"
+                            }`}
+                          >
                             {player ? player.name : "Open"}
                           </p>
-                          <p className="mt-1 text-xs font-semibold text-neutral-600">
+                          <p
+                            className={`mt-1 text-xs font-semibold ${
+                              playerStyle ? playerStyle.muted : "text-neutral-600"
+                            }`}
+                          >
                             {player ? displayCountry(player.country) : ""}
                           </p>
-                          <p className="mt-2 text-lg font-black">{player?.rating ?? ""}</p>
+                          {player ? (
+                            <p
+                              className={`mx-auto mt-2 w-fit rounded px-2 py-1 text-lg font-black ${
+                                playerStyle?.badge ?? "bg-neutral-950 text-white"
+                              }`}
+                            >
+                              {player.rating}
+                            </p>
+                          ) : null}
                         </div>
                       );
                     })}
