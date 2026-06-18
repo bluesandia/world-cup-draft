@@ -31,6 +31,14 @@ function isConfigured() {
   return Boolean(supabaseUrl && supabaseAnonKey);
 }
 
+function supabaseRestUrl() {
+  const baseUrl = (supabaseUrl ?? "")
+    .replace(/\/+$/, "")
+    .replace(/\/rest\/v1$/, "");
+
+  return `${baseUrl}/rest/v1/${tableName}`;
+}
+
 function supabaseHeaders() {
   return {
     apikey: supabaseAnonKey ?? "",
@@ -99,7 +107,7 @@ export async function GET(request: Request) {
   const limit = Number.isFinite(requestedLimit)
     ? Math.min(Math.max(Math.floor(requestedLimit), 1), 500)
     : 10;
-  const url = new URL(`${supabaseUrl}/rest/v1/${tableName}`);
+  const url = new URL(supabaseRestUrl());
   url.searchParams.set("select", "id,name,squad_name,score,result,roster,created_at");
   url.searchParams.set("order", "score.desc,created_at.asc");
   url.searchParams.set("limit", String(limit));
@@ -170,7 +178,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid leaderboard score." }, { status: 400 });
   }
 
-  const response = await fetch(`${supabaseUrl}/rest/v1/${tableName}`, {
+  const response = await fetch(supabaseRestUrl(), {
     method: "POST",
     headers: {
       ...supabaseHeaders(),
